@@ -154,6 +154,12 @@ declare class RiviumPush {
   getDeviceId(): Promise<string | null>;
 
   /**
+   * Get the per-install subscription ID issued by the server during registration.
+   * Returns `null` until registration succeeds at least once.
+   */
+  getSubscriptionId(): Promise<string | null>;
+
+  /**
    * Set user ID for current device
    */
   setUserId(userId: string): Promise<void>;

@@ -710,6 +710,16 @@ class RiviumPush {
   }
 
   /**
+   * Get the per-install subscription ID issued by the server during registration.
+   * This is the canonical addressing key for inbox / A-B / in-app calls and the
+   * new MQTT topic. Returns `null` until registration succeeds at least once.
+   */
+  async getSubscriptionId(): Promise<string | null> {
+    this.checkInitialized();
+    return await RiviumPushNative.getSubscriptionId();
+  }
+
+  /**
    * Set or update user ID for current device
    * Call this after user login to associate device with user
    */

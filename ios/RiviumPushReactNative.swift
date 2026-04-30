@@ -130,6 +130,11 @@ class RiviumPushReactNative: RCTEventEmitter {
         resolve(RiviumPush.shared.getDeviceId())
     }
 
+    @objc(getSubscriptionId:rejecter:)
+    func getSubscriptionId(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        resolve(RiviumPush.shared.getSubscriptionId())
+    }
+
     @objc(setLogLevel:resolver:rejecter:)
     func setLogLevel(level: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         RiviumPush.shared.setLogLevel(RiviumPushLogLevel.fromString(level))

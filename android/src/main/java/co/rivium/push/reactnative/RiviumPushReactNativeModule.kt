@@ -298,6 +298,15 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun getSubscriptionId(promise: Promise) {
+        try {
+            promise.resolve(RiviumPush.getSubscriptionId())
+        } catch (e: Exception) {
+            promise.reject("SUBSCRIPTION_ID_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
     fun setUserId(userId: String, promise: Promise) {
         try {
             RiviumPush.setUserId(userId)
