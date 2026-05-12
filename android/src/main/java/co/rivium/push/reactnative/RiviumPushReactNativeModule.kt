@@ -4,6 +4,8 @@
  */
 package co.rivium.push.reactnative
 
+import android.app.Activity
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -30,7 +32,7 @@ import co.rivium.push.sdk.abtesting.ABTestVariant
 import co.rivium.push.sdk.abtesting.ABTestSummary
 
 class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
-    ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
+    ReactContextBaseJavaModule(reactContext), LifecycleEventListener, ActivityEventListener {
 
     companion object {
         const val TAG = "RiviumPushRN"
@@ -43,6 +45,10 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
 
     init {
         reactContext.addLifecycleEventListener(this)
+        // Listen for onNewIntent so taps from the status-bar shade (warm start)
+        // are forwarded to the native SDK; without this the activity comes to
+        // the foreground but onNotificationTapped / getInitialMessage may miss it.
+        reactContext.addActivityEventListener(this)
     }
 
     override fun getName(): String = NAME
@@ -823,6 +829,18 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
         RiviumPush.setCurrentActivity(null)
     }
 
+    // ActivityEventListener — forward onNewIntent so taps from the shade after
+    // a delay deliver onNotificationTapped / populate getInitialMessage.
+    override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+        // No-op; only onNewIntent is relevant for this module.
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        if (intent != null) {
+            RiviumPush.handleNotificationIntent(intent)
+        }
+    }
+
     // ==================== Private Helpers ====================
 
     private fun setupLifecycleObserver() {
@@ -1046,5 +1064,6 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
     override fun invalidate() {
         super.invalidate()
         RiviumPush.setCurrentActivity(null)
+        reactApplicationContext.removeActivityEventListener(this)
     }
 }
