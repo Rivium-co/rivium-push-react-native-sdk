@@ -466,9 +466,13 @@ extension RiviumPushReactNative: RiviumPushDelegate {
     }
 
     func riviumPush(_ riviumPush: RiviumPush, didReceiveNotificationAction action: NotificationAction, forMessage message: RiviumPushMessage) {
+        let messageDict = message.toDictionary()
         emitEvent("onNotificationAction", body: [
-            "action": action.toDictionary(),
-            "message": message.toDictionary()
+            "actionId": action.id,
+            "title": messageDict["title"] as Any,
+            "body": messageDict["body"] as Any,
+            "data": messageDict["data"] as Any,
+            "messageId": messageDict["messageId"] as Any
         ])
     }
 }
@@ -550,7 +554,10 @@ extension RiviumPushReactNative: UNUserNotificationCenterDelegate {
             RiviumPush.shared.trackABTestClicked(testId: abTestId, variantId: variantId) { _ in }
         }
 
-        if let message = RiviumPushMessage.from(payload: userInfo) {
+        // Only emit onNotificationTapped for body taps. Action-button taps
+        // are dispatched via the SDK delegate as onNotificationAction.
+        let isBodyTap = response.actionIdentifier == UNNotificationDefaultActionIdentifier
+        if isBodyTap, let message = RiviumPushMessage.from(payload: userInfo) {
             emitEvent("onNotificationTapped", body: message.toDictionary())
         }
         completionHandler()

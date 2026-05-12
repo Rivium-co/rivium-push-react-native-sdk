@@ -145,6 +145,34 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
                     }
                     sendEvent("onAppUpdated", map)
                 }
+
+                override fun onNotificationTapped(message: RiviumPushMessage) {
+                    Log.d(TAG, "Notification tapped: ${message.title}")
+                    sendEvent("onNotificationTapped", messageToMap(message))
+                }
+
+                override fun onNotificationAction(message: RiviumPushMessage, actionId: String) {
+                    Log.d(TAG, "Notification action: $actionId for ${message.title}")
+                    val map = Arguments.createMap().apply {
+                        putString("actionId", actionId)
+                        message.title?.let { putString("title", it) }
+                        message.body?.let { putString("body", it) }
+                        message.messageId?.let { putString("messageId", it) }
+                        message.data?.let { data ->
+                            val dataMap = Arguments.createMap()
+                            data.forEach { (k, v) ->
+                                when (v) {
+                                    is String -> dataMap.putString(k, v)
+                                    is Number -> dataMap.putDouble(k, v.toDouble())
+                                    is Boolean -> dataMap.putBoolean(k, v)
+                                    else -> dataMap.putString(k, v.toString())
+                                }
+                            }
+                            putMap("data", dataMap)
+                        }
+                    }
+                    sendEvent("onNotificationAction", map)
+                }
             })
 
             // Set up in-app message callback

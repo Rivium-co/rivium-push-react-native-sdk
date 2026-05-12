@@ -584,6 +584,7 @@ export type OnReconnectingCallback = (state: ReconnectionState) => void;
 export type OnNetworkStateCallback = (state: NetworkState) => void;
 export type OnAppStateCallback = (state: AppState) => void;
 export type OnAppUpdatedCallback = (info: AppUpdateInfo) => void;
+export type OnNotificationTappedCallback = (message: RiviumPushMessage) => void;
 
 // In-App Message Callbacks
 export type OnInAppMessageReadyCallback = (message: InAppMessage) => void;
@@ -833,6 +834,18 @@ class RiviumPush {
       callback({
         isInForeground: data.isInForeground,
       });
+    });
+  }
+
+  /**
+   * Set callback for notification taps. Fires when the user taps a
+   * notification from the system tray / status-bar shade and the app comes
+   * to the foreground. For cold-start taps use {@link getInitialMessage}
+   * (the SDK persists the tapped message until it is read once).
+   */
+  onNotificationTapped(callback: OnNotificationTappedCallback): () => void {
+    return this.addEventListener('onNotificationTapped', (data: any) => {
+      callback(this.parseMessage(data));
     });
   }
 
