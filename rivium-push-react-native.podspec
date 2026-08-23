@@ -22,7 +22,7 @@ Pod::Spec.new do |s|
   # During development, you can use a local path:
   #   pod 'RiviumPush', :path => '../../../../ios/RiviumPush'
   # For production, use the published version from a spec repo or direct URL
-  s.dependency "RiviumPushSDK", "~> 0.1"
+  s.dependency "RiviumPushSDK", "~> 0.1.7"
 
   s.swift_version = "5.0"
 end
