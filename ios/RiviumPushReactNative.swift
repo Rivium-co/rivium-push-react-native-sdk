@@ -77,7 +77,8 @@ class RiviumPushReactNative: RCTEventEmitter {
             apiKey: apiKey,
             usePushKit: configDict["usePushKit"] as? Bool ?? false,
             showNotificationInForeground: configDict["showNotificationInForeground"] as? Bool ?? true,
-            autoConnect: configDict["autoConnect"] as? Bool ?? true
+            autoConnect: configDict["autoConnect"] as? Bool ?? true,
+            appGroup: configDict["appGroup"] as? String
         )
 
         self.showNotificationInForeground = configDict["showNotificationInForeground"] as? Bool ?? true

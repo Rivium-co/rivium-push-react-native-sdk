@@ -47,6 +47,16 @@ export interface RiviumPushConfig {
   usePushKit?: boolean;
   /** Show persistent foreground service notification on Android (default: true) */
   showServiceNotification?: boolean;
+  /**
+   * iOS only. App Group shared with a Notification Service Extension, used to
+   * confirm notification delivery (e.g. "group.com.example.app").
+   *
+   * An extension runs in its own process and cannot read the app's storage, so
+   * delivery confirmation needs a shared container. Enable the same App Group
+   * on both targets and pass it here. Ignored on Android, where the SDK
+   * confirms delivery directly.
+   */
+  appGroup?: string;
 }
 
 /**
@@ -649,6 +659,7 @@ class RiviumPush {
       notificationIcon: config.notificationIcon ?? null,
       usePushKit: config.usePushKit ?? true,
       showServiceNotification: config.showServiceNotification ?? true,
+      appGroup: config.appGroup ?? null,
     };
 
     await RiviumPushNative.init(nativeConfig);
