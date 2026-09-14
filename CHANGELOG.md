@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.11] - 2026-09-14
+
+### Added
+- `autoRefresh` on the `init()` config (default `true`): keeps a registered device up to date on launch.
+- The package reports itself as `react-native` with its version (`SDK_VERSION` export).
+- iOS: delivery confirmation for foreground notifications.
+
+### Changed
+- Requires `RiviumPushSDK ~> 0.1.12` (iOS) and `rivium-push-android:0.1.12`.
+
+### Fixed
+- Android: delivery confirmations were never sent (the package used an older Android SDK).
+- Podspec `source` pointed to a non-existent repository.
+
 ## [0.1.10] - 2026-08-23
 
 ### Added

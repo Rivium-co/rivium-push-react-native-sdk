@@ -78,7 +78,10 @@ class RiviumPushReactNative: RCTEventEmitter {
             usePushKit: configDict["usePushKit"] as? Bool ?? false,
             showNotificationInForeground: configDict["showNotificationInForeground"] as? Bool ?? true,
             autoConnect: configDict["autoConnect"] as? Bool ?? true,
-            appGroup: configDict["appGroup"] as? String
+            appGroup: configDict["appGroup"] as? String,
+            autoRefresh: configDict["autoRefresh"] as? Bool ?? true,
+            wrapperSdkName: configDict["wrapperSdkName"] as? String,
+            wrapperSdkVersion: configDict["wrapperSdkVersion"] as? String
         )
 
         self.showNotificationInForeground = configDict["showNotificationInForeground"] as? Bool ?? true
@@ -531,6 +534,10 @@ extension RiviumPushReactNative: ABTestingDelegate {
 // MARK: - UNUserNotificationCenterDelegate
 extension RiviumPushReactNative: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // This module owns the notification-centre delegate, so the SDK never
+        // sees willPresent. Forward it so foreground deliveries are confirmed.
+        RiviumPush.shared.handleRemoteNotification(userInfo: notification.request.content.userInfo)
+
         if showNotificationInForeground {
             if #available(iOS 14.0, *) {
                 completionHandler([.banner, .sound, .badge])

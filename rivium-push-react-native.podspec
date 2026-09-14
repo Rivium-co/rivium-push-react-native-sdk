@@ -11,7 +11,7 @@ Pod::Spec.new do |s|
   s.authors      = package["author"]
 
   s.platforms    = { :ios => "13.0" }
-  s.source       = { :git => "https://github.com/rivium/rivium-push-react-native.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/Rivium-co/rivium-push-react-native-sdk.git", :tag => "#{s.version}" }
 
   # Only include the React Native bridge files - native SDK comes from dependency
   s.source_files = "ios/RiviumPushReactNative.{m,swift}"
@@ -22,7 +22,7 @@ Pod::Spec.new do |s|
   # During development, you can use a local path:
   #   pod 'RiviumPush', :path => '../../../../ios/RiviumPush'
   # For production, use the published version from a spec repo or direct URL
-  s.dependency "RiviumPushSDK", "~> 0.1.8"
+  s.dependency "RiviumPushSDK", "~> 0.1.12"
 
   s.swift_version = "5.0"
 end

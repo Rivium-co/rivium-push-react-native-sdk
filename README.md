@@ -74,10 +74,13 @@ await RiviumPush.init({
   notificationIcon: 'ic_notification', // Optional - Android notification icon
   usePushKit: false,                   // Optional - iOS VoIP mode for calling apps
   showServiceNotification: true,       // Optional - foreground service notification (Android)
+  autoRefresh: true,                   // Optional - refresh the registration on launch (24h or app/SDK/user change)
 });
 ```
 
 > **Note:** Connection configuration is automatically fetched from the server using your API key. No manual setup needed.
+
+> **iOS silent pushes:** to confirm delivery of background (`content-available`) pushes, call `RiviumPush.shared.handleRemoteNotification(userInfo: userInfo)` from your AppDelegate's `application(_:didReceiveRemoteNotification:fetchCompletionHandler:)`. Foreground and tapped notifications are confirmed automatically.
 
 ## React Hook Example
 

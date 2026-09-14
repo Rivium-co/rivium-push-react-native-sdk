@@ -73,7 +73,11 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
                 showServiceNotification = if (configMap.hasKey("showServiceNotification"))
                     configMap.getBoolean("showServiceNotification") else true,
                 showNotificationInForeground = if (configMap.hasKey("showNotificationInForeground"))
-                    configMap.getBoolean("showNotificationInForeground") else true
+                    configMap.getBoolean("showNotificationInForeground") else true,
+                autoRefresh = if (configMap.hasKey("autoRefresh") && !configMap.isNull("autoRefresh"))
+                    configMap.getBoolean("autoRefresh") else true,
+                wrapperSdkName = if (configMap.hasKey("wrapperSdkName")) configMap.getString("wrapperSdkName") else null,
+                wrapperSdkVersion = if (configMap.hasKey("wrapperSdkVersion")) configMap.getString("wrapperSdkVersion") else null
             )
 
             // Initialize native SDK

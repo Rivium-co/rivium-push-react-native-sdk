@@ -6,6 +6,7 @@
  */
 
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
+import { SDK_NAME, SDK_VERSION } from './version';
 
 const LINKING_ERROR =
   `The package 'rivium-push-react-native' doesn't seem to be linked. Make sure: \n\n` +
@@ -57,6 +58,15 @@ export interface RiviumPushConfig {
    * confirms delivery directly.
    */
   appGroup?: string;
+  /**
+   * Refresh this device's registration automatically on launch (default: true).
+   *
+   * Only applies to installs that registered before. The native SDK
+   * re-registers in the background when 24 hours have passed or the app
+   * version, SDK version or user id changed. It never prompts for permission.
+   * An explicit `register()` always registers.
+   */
+  autoRefresh?: boolean;
 }
 
 /**
@@ -660,6 +670,9 @@ class RiviumPush {
       usePushKit: config.usePushKit ?? true,
       showServiceNotification: config.showServiceNotification ?? true,
       appGroup: config.appGroup ?? null,
+      autoRefresh: config.autoRefresh ?? true,
+      wrapperSdkName: SDK_NAME,
+      wrapperSdkVersion: SDK_VERSION,
     };
 
     await RiviumPushNative.init(nativeConfig);
@@ -1421,6 +1434,9 @@ class RiviumPush {
 }
 
 // Export singleton instance
+/** Version of this package, reported to the server as the SDK version. */
+export { SDK_VERSION };
+
 export default new RiviumPush();
 
 // Also export the class for testing

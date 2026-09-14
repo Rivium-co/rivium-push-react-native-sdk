@@ -18,6 +18,17 @@ export interface RiviumPushConfig {
   usePushKit?: boolean;
   /** Show persistent foreground service notification on Android (default: true) */
   showServiceNotification?: boolean;
+  /** iOS only. App Group shared with a Notification Service Extension, used to confirm notification delivery. */
+  appGroup?: string;
+  /**
+   * Refresh this device's registration automatically on launch (default: true).
+   *
+   * Only applies to installs that registered before. The native SDK
+   * re-registers in the background when 24 hours have passed or the app
+   * version, SDK version or user id changed. It never prompts for permission.
+   * An explicit `register()` always registers.
+   */
+  autoRefresh?: boolean;
 }
 
 /**
@@ -231,5 +242,8 @@ declare class RiviumPush {
 }
 
 declare const riviumPush: RiviumPush;
+/** Version of this package, reported to the server as the SDK version. */
+export declare const SDK_VERSION: string;
+
 export default riviumPush;
 export { RiviumPush };
