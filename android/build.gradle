@@ -39,15 +39,13 @@ android {
 repositories {
     google()
     mavenCentral()
-    mavenLocal()
 }
 
 dependencies {
     implementation "com.facebook.react:react-android:+"
 
-    // Rivium Push Android SDK (published on Maven Central)
-    // For local dev: publish to mavenLocal with ./gradlew publishToMavenLocal
-    implementation 'co.rivium:rivium-push-android:0.1.13'
+    // Rivium Push Android SDK, from Maven Central only (it brings co.rivium:pn-protocol with it)
+    implementation 'co.rivium:rivium-push-android:0.1.14'
 
     // Lifecycle (for ProcessLifecycleOwner - foreground/background detection)
     implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
