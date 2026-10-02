@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.15] - 2026-10-02
+
+### Changed
+- iOS: requires `RiviumPushSDK ~> 0.1.16`, which keeps the signed user token in the Keychain instead of UserDefaults.
+
 ## [0.1.14] - 2026-10-02
 
 ### Added
