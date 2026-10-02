@@ -29,6 +29,29 @@ export interface RiviumPushConfig {
    * An explicit `register()` always registers.
    */
   autoRefresh?: boolean;
+  /**
+   * Returns the signed user token for the signed-in user, or null when no
+   * user is signed in (optional). The same function you pass to Rivium Chat
+   * works here. Can also be set later with `setTokenProvider()`.
+   */
+  tokenProvider?: TokenProvider;
+}
+
+/**
+ * Returns the Rivium user token for the signed-in user, issued by your
+ * server, or null when no user is signed in.
+ */
+export type TokenProvider = () => Promise<string | null | undefined>;
+
+/**
+ * The server refused the user's identity, or the token provider failed.
+ */
+export interface AuthErrorEvent {
+  /** `token_invalid`, `token_required`, `token_expired`, `token_mismatch` or `token_provider_failed`. */
+  code: string;
+  message: string;
+  /** What the token provider threw, when `code` is `token_provider_failed`. */
+  error?: unknown;
 }
 
 /**
@@ -124,6 +147,7 @@ export type OnReconnectingCallback = (state: ReconnectionState) => void;
 export type OnNetworkStateCallback = (state: NetworkState) => void;
 export type OnAppStateCallback = (state: AppState) => void;
 export type OnAppUpdatedCallback = (info: AppUpdateInfo) => void;
+export type OnAuthErrorCallback = (event: AuthErrorEvent) => void;
 
 declare class RiviumPush {
   /**
@@ -179,6 +203,21 @@ declare class RiviumPush {
    * Clear user ID
    */
   clearUserId(): Promise<void>;
+
+  /**
+   * Set, replace or remove (null) the signed user token provider
+   */
+  setTokenProvider(provider: TokenProvider | null): Promise<void>;
+
+  /**
+   * Hand the SDK a signed user token you fetched yourself (null forgets it)
+   */
+  setUserToken(token: string | null): Promise<void>;
+
+  /**
+   * Set callback for identity errors (signed user tokens)
+   */
+  onAuthError(callback: OnAuthErrorCallback): () => void;
 
   /**
    * Get the message that launched the app

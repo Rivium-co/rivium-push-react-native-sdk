@@ -15,6 +15,8 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 
 // Import from native SDK
 import co.rivium.push.sdk.RiviumPush
+import co.rivium.push.sdk.RiviumPushAuthError
+import co.rivium.push.sdk.RiviumPushBlockingTokenProvider
 import co.rivium.push.sdk.RiviumPushCallbackAdapter
 import co.rivium.push.sdk.RiviumPushConfig
 import co.rivium.push.sdk.RiviumPushError
@@ -37,7 +39,23 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
     companion object {
         const val TAG = "RiviumPushRN"
         const val NAME = "RiviumPushReactNative"
+
+        // The module instance whose JS side has a tokenProvider. Null when
+        // none does: nothing is registered with the native SDK then.
+        @Volatile
+        private var tokenProviderOwner: RiviumPushReactNativeModule? = null
+
+        private const val TOKEN_REPLY_TIMEOUT_MS = 10_000L
     }
+
+    // A token request waiting for JS to answer.
+    private class TokenRequest {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        @Volatile var token: String? = null
+        @Volatile var failure: Throwable? = null
+    }
+
+    private val pendingTokenRequests = java.util.concurrent.ConcurrentHashMap<String, TokenRequest>()
 
     private var listenerCount = 0
     private var isInForeground = true
@@ -153,6 +171,15 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
                 override fun onNotificationTapped(message: RiviumPushMessage) {
                     Log.d(TAG, "Notification tapped: ${message.title}")
                     sendEvent("onNotificationTapped", messageToMap(message))
+                }
+
+                override fun onAuthError(error: RiviumPushAuthError) {
+                    // Only meaningful while JS is listening: not queued for later.
+                    if (!reactApplicationContext.hasActiveReactInstance()) return
+                    sendEvent("onAuthError", Arguments.createMap().apply {
+                        putString("code", error.code)
+                        putString("message", error.message)
+                    })
                 }
 
                 override fun onNotificationAction(message: RiviumPushMessage, actionId: String) {
@@ -361,6 +388,83 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("CLEAR_USER_ID_ERROR", e.message)
+        }
+    }
+
+    // ==================== Signed User Tokens ====================
+
+    @ReactMethod
+    fun setTokenProvider(enabled: Boolean, promise: Promise) {
+        try {
+            if (enabled) {
+                tokenProviderOwner = this
+                RiviumPush.setBlockingTokenProvider(RiviumPushBlockingTokenProvider { fetchUserTokenFromJs() })
+            } else {
+                tokenProviderOwner = null
+                RiviumPush.setBlockingTokenProvider(null)
+                failPendingTokenRequests("tokenProvider removed")
+            }
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("TOKEN_PROVIDER_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setUserToken(token: String?, promise: Promise) {
+        try {
+            RiviumPush.setUserToken(token)
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("SET_USER_TOKEN_ERROR", e.message)
+        }
+    }
+
+    /**
+     * JS answers a `getUserToken` event: a token, null when no user is signed
+     * in, or an error when the provider failed.
+     */
+    @ReactMethod
+    fun answerUserToken(requestId: String, token: String?, error: String?) {
+        val request = pendingTokenRequests.remove(requestId) ?: return
+        if (error != null) {
+            request.failure = IllegalStateException(error)
+        } else {
+            request.token = token?.takeIf { it.isNotEmpty() }
+        }
+        request.latch.countDown()
+    }
+
+    /**
+     * Asks JS for the user token. Runs on a native SDK background thread.
+     * Returns null only when JS says no user is signed in; throws when JS
+     * cannot answer, so the native SDK keeps the token it already has.
+     */
+    private fun fetchUserTokenFromJs(): String? {
+        if (tokenProviderOwner !== this || !reactApplicationContext.hasActiveReactInstance()) {
+            throw IllegalStateException("React Native is not running")
+        }
+        val requestId = java.util.UUID.randomUUID().toString()
+        val request = TokenRequest()
+        pendingTokenRequests[requestId] = request
+        try {
+            sendEvent("getUserToken", Arguments.createMap().apply { putString("requestId", requestId) })
+            if (!request.latch.await(TOKEN_REPLY_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                throw java.util.concurrent.TimeoutException("tokenProvider did not answer in time")
+            }
+        } finally {
+            pendingTokenRequests.remove(requestId)
+        }
+        request.failure?.let { throw it }
+        return request.token
+    }
+
+    private fun failPendingTokenRequests(reason: String) {
+        val pending = pendingTokenRequests.values.toList()
+        pendingTokenRequests.clear()
+        pending.forEach {
+            it.failure = IllegalStateException(reason)
+            it.latch.countDown()
         }
     }
 
@@ -1095,6 +1199,12 @@ class RiviumPushReactNativeModule(reactContext: ReactApplicationContext) :
 
     override fun invalidate() {
         super.invalidate()
+        // JS can no longer answer: the native SDK goes on with the token it has.
+        if (tokenProviderOwner === this) {
+            tokenProviderOwner = null
+            RiviumPush.setBlockingTokenProvider(null)
+        }
+        failPendingTokenRequests("React Native bridge invalidated")
         RiviumPush.setCurrentActivity(null)
         reactApplicationContext.removeActivityEventListener(this)
     }

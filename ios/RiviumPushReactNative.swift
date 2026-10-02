@@ -16,6 +16,15 @@ class RiviumPushReactNative: RCTEventEmitter {
     private var showNotificationInForeground: Bool = true
     private var pendingEvents: [(name: String, body: Any?)] = []
 
+    // The module instance whose JS side has a tokenProvider. Nil when none
+    // does: nothing is registered with the native SDK then.
+    private static weak var tokenProviderOwner: RiviumPushReactNative?
+    private static let tokenReplyTimeout: TimeInterval = 10
+
+    // Token requests waiting for JS to answer, by request id.
+    private var pendingTokenRequests: [String: (Result<String?, Error>) -> Void] = [:]
+    private let tokenRequestsLock = NSLock()
+
     override init() {
         super.init()
         RiviumPushReactNative.instance = self
@@ -40,7 +49,10 @@ class RiviumPushReactNative: RCTEventEmitter {
             "onNetworkState",
             "onAppState",
             "onAppUpdated",
+            "onNotificationTapped",
             "onNotificationAction",
+            "onAuthError",
+            "getUserToken",
             "onInAppMessageReady",
             "onInAppButtonClick",
             "onInAppMessageDismissed",
@@ -62,6 +74,16 @@ class RiviumPushReactNative: RCTEventEmitter {
 
     override func stopObserving() {
         hasListeners = false
+    }
+
+    override func invalidate() {
+        // JS can no longer answer: the native SDK goes on with the token it has.
+        if RiviumPushReactNative.tokenProviderOwner === self {
+            RiviumPushReactNative.tokenProviderOwner = nil
+            RiviumPush.shared.setTokenProvider(callback: nil)
+        }
+        failPendingTokenRequests("React Native bridge invalidated")
+        super.invalidate()
     }
 
     // MARK: - Core Methods
@@ -171,6 +193,85 @@ class RiviumPushReactNative: RCTEventEmitter {
     func clearUserId(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
         RiviumPush.shared.clearUserId()
         resolve(nil)
+    }
+
+    // MARK: - Signed User Tokens
+
+    @objc(setTokenProvider:resolver:rejecter:)
+    func setTokenProvider(enabled: Bool, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        if enabled {
+            RiviumPushReactNative.tokenProviderOwner = self
+            RiviumPush.shared.setTokenProvider(callback: { [weak self] completion in
+                guard let self = self else {
+                    completion(.failure(TokenBridgeError("React Native is not running")))
+                    return
+                }
+                self.fetchUserTokenFromJS(completion)
+            })
+        } else {
+            RiviumPushReactNative.tokenProviderOwner = nil
+            RiviumPush.shared.setTokenProvider(callback: nil)
+            failPendingTokenRequests("tokenProvider removed")
+        }
+        resolve(nil)
+    }
+
+    @objc(setUserToken:resolver:rejecter:)
+    func setUserToken(token: String?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        RiviumPush.shared.setUserToken(token)
+        resolve(nil)
+    }
+
+    /// JS answers a `getUserToken` event: a token, nil when no user is signed
+    /// in, or an error when the provider failed.
+    @objc(answerUserToken:token:error:)
+    func answerUserToken(requestId: String, token: String?, error: String?) {
+        guard let completion = takeTokenRequest(requestId) else { return }
+        if let error = error {
+            completion(.failure(TokenBridgeError(error)))
+        } else {
+            completion(.success((token?.isEmpty ?? true) ? nil : token))
+        }
+    }
+
+    private struct TokenBridgeError: LocalizedError {
+        let errorDescription: String?
+        init(_ message: String) { errorDescription = message }
+    }
+
+    /// Asks JS for the user token. Completes with nil only when JS says no
+    /// user is signed in, and with a failure when JS cannot answer, so the
+    /// native SDK keeps the token it already has.
+    private func fetchUserTokenFromJS(_ completion: @escaping (Result<String?, Error>) -> Void) {
+        DispatchQueue.main.async {
+            guard RiviumPushReactNative.tokenProviderOwner === self, self.hasListeners else {
+                completion(.failure(TokenBridgeError("React Native is not running")))
+                return
+            }
+            let requestId = UUID().uuidString
+            self.tokenRequestsLock.lock()
+            self.pendingTokenRequests[requestId] = completion
+            self.tokenRequestsLock.unlock()
+
+            self.sendEvent(withName: "getUserToken", body: ["requestId": requestId])
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + RiviumPushReactNative.tokenReplyTimeout) {
+                self.takeTokenRequest(requestId)?(.failure(TokenBridgeError("tokenProvider did not answer in time")))
+            }
+        }
+    }
+
+    private func takeTokenRequest(_ requestId: String) -> ((Result<String?, Error>) -> Void)? {
+        tokenRequestsLock.lock(); defer { tokenRequestsLock.unlock() }
+        return pendingTokenRequests.removeValue(forKey: requestId)
+    }
+
+    private func failPendingTokenRequests(_ reason: String) {
+        tokenRequestsLock.lock()
+        let pending = pendingTokenRequests
+        pendingTokenRequests.removeAll()
+        tokenRequestsLock.unlock()
+        pending.values.forEach { $0(.failure(TokenBridgeError(reason))) }
     }
 
     // MARK: - Initial Message
@@ -467,6 +568,15 @@ extension RiviumPushReactNative: RiviumPushDelegate {
 
     func riviumPush(_ riviumPush: RiviumPush, didDetectAppUpdate info: AppUpdateInfo) {
         emitEvent("onAppUpdated", body: info.toDictionary())
+    }
+
+    func riviumPush(_ riviumPush: RiviumPush, didFailWithAuthError event: RiviumPushAuthErrorEvent) {
+        // Only meaningful while JS is listening: not queued for later.
+        guard hasListeners else { return }
+        sendEvent(withName: "onAuthError", body: [
+            "code": event.code,
+            "message": event.message
+        ])
     }
 
     func riviumPush(_ riviumPush: RiviumPush, didReceiveNotificationAction action: NotificationAction, forMessage message: RiviumPushMessage) {

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.14] - 2026-10-02
+
+### Added
+- Signed user tokens (optional): `tokenProvider` in the `init()` config, `setTokenProvider()`, `setUserToken()` and `onAuthError()`. The same provider you pass to Rivium Chat works here. Without a provider nothing changes.
+
+### Fixed
+- iOS: `onNotificationTapped` is now delivered, and `getSubscriptionId()` works.
+
+### Changed
+- Requires `RiviumPushSDK ~> 0.1.15` (iOS) and `rivium-push-android:0.1.15`.
+
 ## [0.1.13] - 2026-09-29
 
 ### Changed

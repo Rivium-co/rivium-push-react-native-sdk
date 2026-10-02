@@ -67,6 +67,36 @@ export interface RiviumPushConfig {
    * An explicit `register()` always registers.
    */
   autoRefresh?: boolean;
+  /**
+   * Returns the signed user token for the signed-in user, or null when no
+   * user is signed in (optional). The same function you pass to Rivium Chat
+   * works here. Can also be set later with `setTokenProvider()`.
+   */
+  tokenProvider?: TokenProvider;
+}
+
+/**
+ * Returns the Rivium user token for the signed-in user, issued by your
+ * server, or null when no user is signed in.
+ */
+export type TokenProvider = () => Promise<string | null | undefined>;
+
+/**
+ * The server refused the user's identity, or the token provider failed.
+ * Typically: send the user to login.
+ *
+ * Informational: the request's own error callback is still called as before.
+ */
+export interface AuthErrorEvent {
+  /**
+   * `token_invalid`, `token_required`, `token_expired` (after a failed
+   * refresh), `token_mismatch` (the user id given to the SDK is not the
+   * token's user) or `token_provider_failed`.
+   */
+  code: string;
+  message: string;
+  /** What the token provider threw, when `code` is `token_provider_failed`. */
+  error?: unknown;
 }
 
 /**
@@ -605,6 +635,7 @@ export type OnNetworkStateCallback = (state: NetworkState) => void;
 export type OnAppStateCallback = (state: AppState) => void;
 export type OnAppUpdatedCallback = (info: AppUpdateInfo) => void;
 export type OnNotificationTappedCallback = (message: RiviumPushMessage) => void;
+export type OnAuthErrorCallback = (event: AuthErrorEvent) => void;
 
 // In-App Message Callbacks
 export type OnInAppMessageReadyCallback = (message: InAppMessage) => void;
@@ -654,6 +685,12 @@ const subscriptions: Map<string, EventSubscription> = new Map();
 class RiviumPush {
   private initialized = false;
 
+  /** The app's token provider, asked by the native SDK through `getUserToken`. */
+  private tokenProvider: TokenProvider | null = null;
+  private tokenRequestSubscription: EventSubscription | null = null;
+  /** What the provider last threw, attached to the auth error that follows. */
+  private tokenProviderError: unknown = undefined;
+
   /**
    * Initialize the RiviumPush SDK
    * Must be called before any other method
@@ -674,6 +711,11 @@ class RiviumPush {
       wrapperSdkName: SDK_NAME,
       wrapperSdkVersion: SDK_VERSION,
     };
+
+    // Before init, so the first registration already carries the token.
+    if (config.tokenProvider) {
+      await this.setTokenProvider(config.tokenProvider);
+    }
 
     await RiviumPushNative.init(nativeConfig);
     this.initialized = true;
@@ -759,6 +801,83 @@ class RiviumPush {
   async clearUserId(): Promise<void> {
     this.checkInitialized();
     await RiviumPushNative.clearUserId();
+  }
+
+  // ==========================================================================
+  // Signed User Tokens
+  // ==========================================================================
+
+  /**
+   * Set, replace or remove (null) the signed user token provider.
+   * Same as `tokenProvider` in the `init()` config; may be called before `init()`.
+   *
+   * The provider is asked whenever the SDK needs a fresh token. If it throws
+   * or does not answer within 10 seconds, the request is sent without a token
+   * and `onAuthError` reports `token_provider_failed`.
+   */
+  async setTokenProvider(provider: TokenProvider | null): Promise<void> {
+    this.tokenProvider = provider;
+    this.tokenProviderError = undefined;
+
+    if (provider && !this.tokenRequestSubscription) {
+      this.tokenRequestSubscription = eventEmitter.addListener('getUserToken', (data: any) => {
+        this.answerTokenRequest(data?.requestId);
+      });
+    } else if (!provider && this.tokenRequestSubscription) {
+      this.tokenRequestSubscription.remove();
+      this.tokenRequestSubscription = null;
+    }
+
+    await RiviumPushNative.setTokenProvider(provider != null);
+  }
+
+  /**
+   * Hand the SDK a signed user token you fetched yourself (null forgets it).
+   *
+   * Without a token provider the SDK cannot renew it: call this again
+   * whenever you refresh the token.
+   */
+  async setUserToken(token: string | null): Promise<void> {
+    await RiviumPushNative.setUserToken(token ? token : null);
+  }
+
+  /**
+   * Set callback for identity errors: the server refused the user token, or
+   * the token provider failed. Typically: send the user to login.
+   */
+  onAuthError(callback: OnAuthErrorCallback): () => void {
+    return this.addEventListener('onAuthError', (data: any) => {
+      const code = data?.code || '';
+      const event: AuthErrorEvent = {
+        code,
+        message: data?.message || 'Authentication failed',
+      };
+      if (code === 'token_provider_failed' && this.tokenProviderError !== undefined) {
+        event.error = this.tokenProviderError;
+        this.tokenProviderError = undefined;
+      }
+      callback(event);
+    });
+  }
+
+  /** Answers the native SDK's request for a user token. */
+  private async answerTokenRequest(requestId: string): Promise<void> {
+    if (!requestId) return;
+    const provider = this.tokenProvider;
+    if (!provider) {
+      // Not "signed out": the native SDK keeps the token it already has.
+      RiviumPushNative.answerUserToken(requestId, null, 'No tokenProvider set');
+      return;
+    }
+    let token: string | null | undefined;
+    try {
+      token = await provider();
+    } catch (e) {
+      this.tokenProviderError = e;
+      RiviumPushNative.answerUserToken(requestId, null, `tokenProvider failed: ${e}`);
+      return;
+    }
+    RiviumPushNative.answerUserToken(requestId, token ? token : null, null);
   }
 
   /**

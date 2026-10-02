@@ -27,6 +27,9 @@ RCT_EXTERN_METHOD(isConnected:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(getDeviceId:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(getSubscriptionId:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(setLogLevel:(NSString *)level
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
@@ -49,6 +52,20 @@ RCT_EXTERN_METHOD(setUserId:(NSString *)userId
 
 RCT_EXTERN_METHOD(clearUserId:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
+
+// MARK: - Signed User Tokens
+
+RCT_EXTERN_METHOD(setTokenProvider:(BOOL)enabled
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(setUserToken:(NSString *)token
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(answerUserToken:(NSString *)requestId
+                  token:(NSString *)token
+                  error:(NSString *)error)
 
 // MARK: - Initial Message
 

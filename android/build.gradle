@@ -45,7 +45,7 @@ dependencies {
     implementation "com.facebook.react:react-android:+"
 
     // Rivium Push Android SDK, from Maven Central only (it brings co.rivium:pn-protocol with it)
-    implementation 'co.rivium:rivium-push-android:0.1.14'
+    implementation 'co.rivium:rivium-push-android:0.1.15'
 
     // Lifecycle (for ProcessLifecycleOwner - foreground/background detection)
     implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
